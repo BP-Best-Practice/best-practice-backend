@@ -77,7 +77,7 @@
 
 이 프로젝트는 **Test-Driven Development (TDD)** 방식으로 개발되고 있습니다.
 
-**🔗 [FastAPI 공식문서 참고]([https://dbdiagram.io/d/PR-generation-service-ERD-68527617f039ec6d36c0137c](https://fastapi.tiangolo.com/ko/tutorial/testing/?h=%ED%85%8C%EC%8A%A4%ED%8A%B8))**
+**🔗 [FastAPI 공식문서 참고](https://fastapi.tiangolo.com/ko/tutorial/testing/?h=%ED%85%8C%EC%8A%A4%ED%8A%B8)**
 
 ### TDD 사이클 적용
 ```
