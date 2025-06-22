@@ -19,7 +19,7 @@ def test_pr_generation():
     logging.debug("Commit history: %s", commits)
 
     # when
-    response = client.post("/generate_pr", json=commits)
+    response = client.post("/pr_generation", json={"commits" : commits})
     logger.debug("Response: %s", response.json())
 
     response_data = response.json()
