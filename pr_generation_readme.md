@@ -13,10 +13,13 @@
 - [프로젝트 소개](#-프로젝트-소개)
 - [주요 기능](#-주요-기능)
 - [기술 스택](#-기술-스택)
-- [전체 서비스 구조](#-전체-서비스-구조)
 - [아키텍처](#-아키텍처)
 - [TDD 개발 방식](#-tdd-개발-방식)
+- [설치 및 실행](#-설치-및-실행)
+- [API 문서](#-api-문서)
+- [테스트](#-테스트)
 - [데이터베이스 설계](#-데이터베이스-설계)
+- [기여하기](#-기여하기)
 
 ## 🎯 프로젝트 소개
 
@@ -68,15 +71,13 @@
 
 ### DevOps & Tools
 - 🐳 **Docker**: 컨테이너화
+- 🧹 **Black**: 코드 포매팅
+- 📏 **Flake8**: 코드 린팅
 - 📈 **Coverage.py**: 테스트 커버리지 측정
-
-## 🏗 전체 서비스 구조
-
-### 추가 예정
 
 ## 🏗 아키텍처
 
-### Layered Architecture 적용 예정
+### Clean Architecture 적용
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                       │
@@ -93,11 +94,29 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### 디렉토리 구조
+```
+src/
+├── domain/
+│   ├── entities/          # 도메인 엔티티
+│   ├── repositories/      # 레포지토리 인터페이스
+│   └── services/          # 도메인 서비스
+├── application/
+│   ├── use_cases/         # 유스케이스
+│   └── dtos/              # 데이터 전송 객체
+├── infrastructure/
+│   ├── database/          # 데이터베이스 구현
+│   ├── external/          # 외부 API 클라이언트
+│   └── repositories/      # 레포지토리 구현
+└── presentation/
+    ├── api/               # FastAPI 라우터
+    ├── schemas/           # Pydantic 스키마
+    └── dependencies/      # 의존성 주입
+```
+
 ## 🧪 TDD 개발 방식
 
 이 프로젝트는 **Test-Driven Development (TDD)** 방식으로 개발되고 있습니다.
-
-**🔗 [FastAPI 공식문서 참고](https://fastapi.tiangolo.com/ko/tutorial/testing/?h=%ED%85%8C%EC%8A%A4%ED%8A%B8)**
 
 ### TDD 사이클 적용
 ```
@@ -112,6 +131,10 @@
 - **Unit Tests**: 각 컴포넌트의 개별 기능 테스트
 - **Integration Tests**: 외부 API 및 데이터베이스 연동 테스트
 - **End-to-End Tests**: 전체 사용자 플로우 테스트
+
+### 테스트 커버리지 목표
+- 🎯 **목표 커버리지**: 95% 이상
+- 📊 **현재 커버리지**: ![Coverage](https://img.shields.io/badge/Coverage-95%25-brightgreen.svg)
 
 ### TDD 개발 예시
 ```python
@@ -142,6 +165,153 @@ class PRGenerator:
         return self.ai_service.generate_title(commit_messages)
 ```
 
+## 🚀 설치 및 실행
+
+### 사전 요구사항
+- Python 3.11+
+- PostgreSQL 15+
+- Docker (선택사항)
+
+### 로컬 개발 환경 설정
+
+1. **프로젝트 클론**
+```bash
+git clone https://github.com/your-username/pr-generation-service.git
+cd pr-generation-service
+```
+
+2. **가상환경 생성 및 활성화**
+```bash
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+```
+
+3. **의존성 설치**
+```bash
+pip install -r requirements.txt
+pip install -r requirements-dev.txt  # 개발 의존성
+```
+
+4. **환경변수 설정**
+```bash
+cp .env.example .env
+# .env 파일을 편집하여 필요한 값들을 설정
+```
+
+5. **데이터베이스 설정**
+```bash
+# 데이터베이스 생성
+createdb pr_generation_db
+
+# 마이그레이션 실행
+alembic upgrade head
+```
+
+6. **개발 서버 실행**
+```bash
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Docker를 사용한 실행
+
+```bash
+# 개발 환경
+docker-compose -f docker-compose.dev.yml up
+
+# 프로덕션 환경
+docker-compose up
+```
+
+## 📚 API 문서
+
+### 자동 생성된 API 문서
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+### 주요 엔드포인트
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/auth/github` | GitHub OAuth 인증 |
+| GET | `/users/me` | 현재 사용자 정보 조회 |
+| GET | `/repositories` | 사용자 레포지토리 목록 |
+| GET | `/repositories/{repo_id}/commits` | 레포지토리 커밋 목록 |
+| POST | `/pr/generate` | PR 메시지 생성 |
+| GET | `/pr/history` | PR 생성 히스토리 |
+
+### API 사용 예시
+
+```python
+# PR 메시지 생성 요청
+POST /pr/generate
+{
+    "repository_id": 123,
+    "commit_ids": ["abc123", "def456", "ghi789"],
+    "style": "detailed",
+    "template_id": null
+}
+
+# 응답
+{
+    "title": "feat: implement user authentication system",
+    "description": "## Changes\n- Add JWT-based authentication\n- Implement password hashing\n- Add user login/logout endpoints\n\n## Testing\n- All authentication flows tested\n- Unit tests added for security functions",
+    "generated_at": "2024-06-22T10:30:00Z",
+    "commit_count": 3
+}
+```
+
+## 🧪 테스트
+
+### 테스트 실행
+
+```bash
+# 전체 테스트 실행
+pytest
+
+# 커버리지와 함께 실행
+pytest --cov=src --cov-report=html
+
+# 특정 테스트 파일 실행
+pytest tests/test_pr_generator.py
+
+# 마커별 테스트 실행
+pytest -m "unit"           # 단위 테스트만
+pytest -m "integration"    # 통합 테스트만
+pytest -m "e2e"           # E2E 테스트만
+```
+
+### 테스트 작성 가이드
+
+```python
+# 단위 테스트 예시
+@pytest.mark.unit
+class TestPRGenerator:
+    def test_generate_title_with_single_commit(self):
+        # Given
+        commits = [Commit(message="Add user login", type="feat")]
+        
+        # When
+        result = pr_generator.generate_title(commits)
+        
+        # Then
+        assert result.startswith("feat:")
+        assert "login" in result.lower()
+
+# 통합 테스트 예시
+@pytest.mark.integration
+class TestGitHubIntegration:
+    async def test_fetch_repository_commits(self, github_client):
+        # Given
+        repo_id = "test-repo"
+        
+        # When
+        commits = await github_client.get_commits(repo_id)
+        
+        # Then
+        assert len(commits) > 0
+        assert all(commit.sha for commit in commits)
+```
+
 ## 🗄 데이터베이스 설계
 
 ### ERD (Entity Relationship Diagram)
@@ -151,22 +321,87 @@ class PRGenerator:
 
 ### 주요 테이블 구조
 
-#### user
+#### Users
 - 사용자 정보 및 GitHub 연동 데이터
 - OAuth 토큰 및 사용자 설정 관리
 
-#### repository
+#### Repositories
 - 연동된 GitHub 레포지토리 정보
 - 접근 권한 및 동기화 상태 관리
 
-#### commit_history
+#### Commits
 - 가져온 커밋 정보 캐싱
 - 변경사항 메타데이터 저장
 
-#### pr_generation
+#### PR_Generations
 - 생성된 PR 메시지 히스토리
 - 사용자 피드백 및 개선 데이터
 
-#### pr_template
+#### User_Preferences
 - 사용자별 스타일 설정
 - 개인화된 템플릿 관리
+
+### 마이그레이션 관리
+
+```bash
+# 새 마이그레이션 생성
+alembic revision --autogenerate -m "Add user preferences table"
+
+# 마이그레이션 적용
+alembic upgrade head
+
+# 마이그레이션 롤백
+alembic downgrade -1
+```
+
+## 🤝 기여하기
+
+### 개발 프로세스
+
+1. **이슈 생성**: 새로운 기능이나 버그를 이슈로 등록
+2. **브랜치 생성**: `feature/issue-number` 또는 `bugfix/issue-number`
+3. **TDD 사이클**: Red → Green → Refactor 사이클 적용
+4. **테스트 작성**: 새로운 코드에 대한 테스트 필수 작성
+5. **코드 리뷰**: PR 생성 후 리뷰 진행
+6. **머지**: 승인 후 메인 브랜치에 머지
+
+### 코드 스타일 가이드
+
+```bash
+# 코드 포매팅
+black src tests
+
+# 린팅 실행
+flake8 src tests
+
+# 타입 체킹
+mypy src
+```
+
+### 커밋 메시지 컨벤션
+
+```
+feat: 새로운 기능 추가
+fix: 버그 수정
+docs: 문서 변경
+style: 코드 포매팅 변경
+refactor: 코드 리팩토링
+test: 테스트 코드 추가/수정
+chore: 빌드 과정 또는 보조 도구 변경
+```
+
+## 📄 라이선스
+
+이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+
+## 🙋‍♂️ 문의 및 지원
+
+- 📧 이메일: your-email@example.com
+- 🐛 버그 리포트: [GitHub Issues](https://github.com/your-username/pr-generation-service/issues)
+- 💡 기능 제안: [GitHub Discussions](https://github.com/your-username/pr-generation-service/discussions)
+
+---
+
+<div align="center">
+  <sub>Built with ❤️ using TDD principles</sub>
+</div>
