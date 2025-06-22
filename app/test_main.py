@@ -7,24 +7,18 @@ from app import dummy
 from app.main import app
 
 client = TestClient(app)
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-logger = logging.getLogger(__name__)
 
 # test pr generation
 def test_pr_generation():
     # given
     commits = dummy.commit_history
-    logging.debug("Commit history: %s", commits)
 
     # when
     response = client.post("/pr_generation", json={"commits" : commits})
-    logger.debug("Response: %s", response.json())
 
     response_data = response.json()
-    logger.debug("Response data: %s", response_data)
 
     # then
     assert response.status_code == 200, "Expected status code 200, got %s" % response.status_code
     assert response_data["title"] == "Test PR"
+    assert response_data["body"] == "This is a test PR body"
