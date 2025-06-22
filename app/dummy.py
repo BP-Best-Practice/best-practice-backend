@@ -44,3 +44,11 @@ commit_history = [
         "tags": ["v1.3", "documentation"],
     },
 ]
+
+
+test_pr_generation = {
+    "title": "Test PR",
+    "description": "This is a test PR",
+    "base_branch": "main",
+    "target_branch": "feature/test-pr",
+}
