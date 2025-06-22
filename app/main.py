@@ -6,12 +6,14 @@ from .schemas import Commit, PRGenerationRequest
 app = FastAPI()
 
 logging.basicConfig(
-    filename="app.log",
+    filename="app/app.log",
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+logger.debug("Starting FastAPI application")
 
 @app.post("/pr_generation")
 def pr_generation(request: PRGenerationRequest):
