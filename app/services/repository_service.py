@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from ..models import Repository, User
 from typing import Optional, List, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -36,8 +36,12 @@ class RepositoryService:
                 existing_repo = existing_repos[github_id]
                 github_updated = self._parse_github_datetime(github_data.get('updated_at'))
                 
+                # 타임존 정규화 후 비교
+                # 이전 코드: 타임존 정보가 있는 datetime(offset-aware)과 타임존 정보가 없는 datetime(offset-naive) 비교 에러 발생
+                #   github_updated > existing_repo.repo_updated_at):
+                # TypeError: can't compare offset-naive and offset-aware datetimes
                 if github_updated and (not existing_repo.repo_updated_at or 
-                                     github_updated > existing_repo.repo_updated_at):
+                                    self._normalize_datetime(github_updated) > self._normalize_datetime(existing_repo.repo_updated_at)):
                     self._update_repository_from_github_data(existing_repo, github_data)
                     stats['updated'] += 1
                 else:
@@ -81,7 +85,7 @@ class RepositoryService:
             repo_updated_at=self._parse_github_datetime(data.get('updated_at')),
             repo_pushed_at=self._parse_github_datetime(data.get('pushed_at')),
             archived=data.get('archived', False),
-            last_synced_at=datetime.now()
+            last_synced_at=self._get_current_utc_datetime()
         )
     
     def _update_repository_from_github_data(self, repo: Repository, data: Dict):
@@ -97,16 +101,45 @@ class RepositoryService:
         repo.repo_updated_at = self._parse_github_datetime(data.get('updated_at'))
         repo.repo_pushed_at = self._parse_github_datetime(data.get('pushed_at'))
         repo.archived = data.get('archived', False)
-        repo.last_synced_at = datetime.now()
+        repo.last_synced_at = self._get_current_utc_datetime()
     
-    def _parse_github_datetime(self, datetime_str: Optional[str]):
-        """GitHub API의 ISO 형식 datetime 문자열을 파싱"""
+    def _parse_github_datetime(self, datetime_str: Optional[str]) -> Optional[datetime]:
+        """GitHub API의 ISO 형식 datetime 문자열을 파싱 (타임존 제거)"""
         if not datetime_str:
             return None
         try:
-            return datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
-        except:
+            # GitHub API는 UTC 시간을 'Z'로 표시
+            if datetime_str.endswith('Z'):
+                # Z를 제거하고 naive datetime으로 변환 (UTC 기준)
+                dt = datetime.fromisoformat(datetime_str[:-1])
+                return dt
+            elif '+' in datetime_str or datetime_str.endswith('+00:00'):
+                # 다른 타임존 형식 처리
+                dt = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
+                # UTC로 변환 후 naive로 만들기
+                return dt.astimezone(timezone.utc).replace(tzinfo=None)
+            else:
+                # 이미 naive datetime인 경우
+                return datetime.fromisoformat(datetime_str)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to parse datetime '{datetime_str}': {e}")
             return None
+    
+    def _normalize_datetime(self, dt: Optional[datetime]) -> Optional[datetime]:
+        """datetime을 비교 가능한 형태로 정규화 (모두 naive UTC로)"""
+        if not dt:
+            return None
+        
+        if dt.tzinfo is not None:
+            # offset-aware인 경우 UTC로 변환 후 naive로 만들기
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        else:
+            # 이미 naive인 경우 그대로 반환 (UTC라고 가정)
+            return dt
+    
+    def _get_current_utc_datetime(self) -> datetime:
+        """현재 UTC 시간을 naive datetime으로 반환"""
+        return datetime.now(timezone.utc).replace(tzinfo=None)
     
     def get_user_repositories(self, user_id: int, include_archived: bool = False) -> List[Repository]:
         """사용자의 저장소 목록 조회"""

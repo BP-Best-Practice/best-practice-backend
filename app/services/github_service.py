@@ -93,6 +93,8 @@ class GitHubService:
             headers['If-None-Match'] = stored_etag
         
         try:
+            logger.info(f"headers: {headers}")
+
             response = requests.get(
                 f"{self.github_uri}/user/repos?sort=updated&per_page=100",
                 headers=headers,
@@ -115,6 +117,7 @@ class GitHubService:
             
             # 200 OK - 변경사항 있음 또는 새로운 데이터
             if response.status_code == 200:
+                logger.info(f"Response ETag: {response.headers.get('ETag')}")
                 new_etag = response.headers.get('ETag')
                 github_repos = response.json()
                 
