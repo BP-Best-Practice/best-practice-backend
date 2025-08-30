@@ -1,5 +1,8 @@
 import os
 import logging
+
+from pathlib import Path
+
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from .schemas import Commit, PRGenerationRequest
@@ -9,8 +12,8 @@ from .services.github_service import GitHubService
 from .services.user_service import UserService
 from dotenv import load_dotenv
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+PROJECT_ROOT = Path(__file__).parent.parent
+load_dotenv(PROJECT_ROOT / ".env")
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
