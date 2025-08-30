@@ -9,6 +9,7 @@ from .schemas import Commit, PRGenerationRequest
 from .database import get_db, engine
 from .models import Base
 from .services.github_service import GitHubService
+from .services.repository_service import RepositoryService
 from .services.user_service import UserService
 from dotenv import load_dotenv
 
@@ -52,21 +53,47 @@ def pr_generation(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/repos/{user_id}")
-def get_repos(user_id: int, db: Session = Depends(get_db)) -> dict:
-    """사용자의 저장소 목록 조회"""
-    #try:
-    github_service = GitHubService(db)
-    return github_service.get_user_repos(user_id)
+def get_repos(
+    user_id: int, 
+    force_refresh: bool = False,
+    include_archived: bool = False,
+    db: Session = Depends(get_db)
+) -> dict:
+    """사용자의 저장소 목록 조회 (ETag 캐싱 적용)"""
+    try:
+        github_service = GitHubService(db)
+        result = github_service.get_user_repos(user_id, force_refresh=force_refresh)
         
-    # except ValueError as e:
-    #     logger.error(f"User validation error: {e}")
-    #     raise HTTPException(status_code=400, detail=str(e))
-    # except ConnectionError as e:
-    #     logger.error(f"GitHub API error: {e}")
-    #     raise HTTPException(status_code=502, detail=str(e))
-    # except Exception as e:
-    #     logger.error(f"Unexpected error: {e}")
-    #     raise HTTPException(status_code=500, detail="내부 서버 오류")
+        # 아카이브된 저장소 필터링
+        if not include_archived and 'data' in result:
+            result['data'] = [
+                repo for repo in result['data'] 
+                if not repo.get('archived', False)
+            ]
+        
+        return result
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ConnectionError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+@app.post("/repos/{user_id}/{repo_id}/favorite")
+def toggle_favorite_repository(
+    user_id: int,
+    repo_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+        저장소 즐겨찾기 토글
+    """
+    repo_service = RepositoryService(db)
+    is_favorited = repo_service.toggle_favorite(user_id, repo_id)
+    
+    return {
+        "repository_id": repo_id,
+        "is_favorited": is_favorited
+    }
 
 @app.get("/commits/{user_id}/{owner}/{repository_name}")
 def get_commits(
