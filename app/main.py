@@ -1,13 +1,19 @@
 import os
 import logging
-import requests
-
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
 from .schemas import Commit, PRGenerationRequest
+from .database import get_db, engine
+from .models import Base
+from .services.github_service import GitHubService
+from .services.user_service import UserService
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+# 데이터베이스 테이블 생성
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
@@ -19,105 +25,72 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-logger.debug("Starting FastAPI application")
-
 @app.post("/pr_generation")
-def pr_generation(request: PRGenerationRequest):
-
-    for commit in request.commits:
-        if not isinstance(commit, Commit):
-            logging.error("Invalid commit data: %s", commit)
-            raise ValueError("올바른 커밋 데이터가 아닙니다.")
-        
-        recommended_pr = pr_generation_handler([commit])
-    
+def pr_generation(
+    request: PRGenerationRequest, 
+    db: Session = Depends(get_db)
+):
+    """PR 생성 요청 처리"""
+    try:
+        for commit in request.commits:
+            if not isinstance(commit, Commit):
+                logging.error("Invalid commit data: %s", commit)
+                raise ValueError("올바른 커밋 데이터가 아닙니다.")
+            
+        recommended_pr = pr_generation_handler(request.commits)
         logger.debug("Recommended PR: %s", recommended_pr)
+        
+        # PR 생성 기록을 데이터베이스에 저장하는 로직 추가 가능
+        
+        return recommended_pr
+        
+    except Exception as e:
+        logger.error(f"PR generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    logging.debug("Received PR generation request with %d commits", len(request.commits))
-    return recommended_pr
+@app.get("/repos/{user_id}")
+def get_repos(user_id: int, db: Session = Depends(get_db)) -> dict:
+    """사용자의 저장소 목록 조회"""
+    #try:
+    github_service = GitHubService(db)
+    return github_service.get_user_repos(user_id)
+        
+    # except ValueError as e:
+    #     logger.error(f"User validation error: {e}")
+    #     raise HTTPException(status_code=400, detail=str(e))
+    # except ConnectionError as e:
+    #     logger.error(f"GitHub API error: {e}")
+    #     raise HTTPException(status_code=502, detail=str(e))
+    # except Exception as e:
+    #     logger.error(f"Unexpected error: {e}")
+    #     raise HTTPException(status_code=500, detail="내부 서버 오류")
+
+@app.get("/commits/{user_id}/{owner}/{repository_name}")
+def get_commits(
+    user_id: int, 
+    owner: str, 
+    repository_name: str, 
+    db: Session = Depends(get_db)
+) -> dict:
+    """저장소의 커밋 목록 조회"""
+    try:
+        github_service = GitHubService(db)
+        return github_service.get_commits(user_id, owner, repository_name)
+        
+    except ValueError as e:
+        logger.error(f"User validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except ConnectionError as e:
+        logger.error(f"GitHub API error: {e}")
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="내부 서버 오류")
 
 def pr_generation_handler(commits: list[Commit]):
+    """PR 생성 핸들러"""
     logging.info("Generating PR with %d commits", len(commits))
-    return {"title": "Test PR",
-            "body": "This is a test PR body",}
-
-@app.get("/repos")
-def get_repos() -> dict:
-    logging.info("Fetching repositories")
-
-    github_uri = "https://api.github.com"
-    path = "/user/repos"
-
-    user_token = os.getenv("GITHUB_TOKEN")
-    if not user_token:
-        logging.error("GITHUB_TOKEN not found in environment variables")
-        raise EnvironmentError("GITHUB_TOKEN not found in environment variables")
-    headers = {
-        "Authorization": f"Bearer {user_token}",
-        'Accept': 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': '2022-11-28'
+    return {
+        "title": "Test PR",
+        "body": "This is a test PR body",
     }
-
-    response = requests.get(github_uri + path, headers=headers)
-
-    if response.status_code != 200:
-        logging.error("Failed to fetch repositories: %s", response.text)
-        raise ConnectionError(f"Failed to fetch repositories: {response.status_code}")
-    logging.info("Successfully fetched repositories")
-    
-
-    response = {
-        "status_code": response.status_code,
-        "data": response.json()
-    }
-
-    return response
-
-@app.get("/commits/{repository_name}")
-def get_commits(repository_name: str) -> dict:
-    logging.info("Fetching commits")
-
-    print(f"Repository name: {repository_name}")
-
-    github_uri = "https://api.github.com"
-
-    owner = os.getenv("GITHUB_REPO_OWNER")
-    # owner = "cookiemiro"
-
-    print(f"Repository owner: {owner}")
-
-    logging.debug("Repository owner: %s", owner)
-
-    # if not repository_name or not owner:
-    #     logging.error("GITHUB_REPO_NAME or GITHUB_REPO_OWNER not found in environment variables")
-    #     raise EnvironmentError("GITHUB_REPO_NAME or GITHUB_REPO_OWNER not found in environment variables")
-   
-    path = f"/repos/{owner}/{repository_name}/commits"
-
-    user_token = os.getenv("GITHUB_TOKEN")
-    if not user_token:
-        logging.error("GITHUB_TOKEN not found in environment variables")
-        raise EnvironmentError("GITHUB_TOKEN not found in environment variables")
-    
-    headers = {
-        "Authorization": f"Bearer {user_token}",
-        'Accept': 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': '2022-11-28'
-    }
-
-    response = requests.get(github_uri + path, headers=headers, timeout=10)
-
-    if response.status_code != 200:
-        logging.error("Failed to fetch commits: %s", response.text)
-        raise ConnectionError(f"Failed to fetch commits: {response.status_code}")
-    logging.info("Successfully fetched commits")
-    
-
-    response = {
-        "status_code": response.status_code,
-        "data": response.json()
-    }
-
-    return response
