@@ -1,12 +1,18 @@
-from sqlalchemy.orm import Session
-from app.models import Repository, User
-from typing import Optional, List, Dict
-from datetime import datetime, timedelta, timezone
+"""저장소 관련 서비스 모듈"""
+
 import logging
+
+from datetime import datetime, timezone
+from typing import Optional, List, Dict
+from sqlalchemy.orm import Session
+from app.models import Repository
 
 logger = logging.getLogger(__name__)
 
 class RepositoryService:
+    """
+        저장소 관련 서비스 클래스
+    """
     def __init__(self, db: Session):
         self.db = db
     
@@ -59,7 +65,10 @@ class RepositoryService:
                 stats['deleted'] += 1
         
         self.db.commit()
-        logger.info(f"Repository sync stats for user {user_id}: {stats}")
+
+        # 지연 로깅 방식으로 리팩토링
+        # logger.info(f"Repository sync stats for user {user_id}: {stats}")
+        logger.info("Repository sync stats for user %s: %s", user_id, stats)
         
         return {
             "status_code": 200,
@@ -122,7 +131,11 @@ class RepositoryService:
                 # 이미 naive datetime인 경우
                 return datetime.fromisoformat(datetime_str)
         except (ValueError, TypeError) as e:
-            logger.warning(f"Failed to parse datetime '{datetime_str}': {e}")
+            
+            # f-string은 런타임에 평가(즉시 문자열 생성)되므로, 로깅 시점에 변수를 전달하는 방식으로 변경
+            # cpu 낭비 방지 => but, 가독성이 좋기 때문에 애플리케이션의 성능에 큰 영향이 없다면 f-string을 유지하는 것도 고려 가능
+            #logger.warning(f"Failed to parse datetime '{datetime_str}': {e}")
+            logger.warning("Failed to parse datetime '{datetime_str}': {e}", datetime_str=datetime_str, e=e)
             return None
     
     def _normalize_datetime(self, dt: Optional[datetime]) -> Optional[datetime]:
@@ -146,7 +159,7 @@ class RepositoryService:
         query = self.db.query(Repository).filter(Repository.user_id == user_id)
         
         if not include_archived:
-            query = query.filter(Repository.archived == False)
+            query = query.filter(not Repository.archived)
             
         return query.order_by(Repository.repo_pushed_at.desc()).all()
     
@@ -155,7 +168,7 @@ class RepositoryService:
         return self.db.query(Repository).filter(
             Repository.user_id == user_id,
             Repository.name == repo_name,
-            Repository.archived == False
+            not Repository.archived # 아카이브된 저장소 제외
         ).first()
     
     def increment_access_count(self, repository_id: int):
