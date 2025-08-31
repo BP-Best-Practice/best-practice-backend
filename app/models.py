@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, Boolean, TIMESTAMP, BIGINT, ARRAY, JSON
-from sqlalchemy.sql import func
+from sqlalchemy.sql import functions
 from sqlalchemy.orm import relationship
 from sqlalchemy import ForeignKey
 from .database import Base
@@ -21,8 +21,8 @@ class User(Base):
     preferences = Column(JSON)
     
     # Meta fields
-    created_at = Column(TIMESTAMP, default=func.now())
-    updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
+    created_at = Column(TIMESTAMP, default=functions.now())
+    updated_at = Column(TIMESTAMP, default=functions.now(), onupdate=functions.now())
     last_login_at = Column(TIMESTAMP)
     
     # Relationships
@@ -53,8 +53,8 @@ class Repository(Base):
     is_favorited = Column(Boolean, default=False)
     access_count = Column(Integer, default=0)
     last_synced_at = Column(TIMESTAMP)
-    created_at = Column(TIMESTAMP, default=func.now())
-    updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
+    created_at = Column(TIMESTAMP, default=functions.now())
+    updated_at = Column(TIMESTAMP, default=functions.now(), onupdate=functions.now())
     
     # Relationships
     user = relationship("User", back_populates="repositories")
@@ -79,7 +79,7 @@ class PRGeneration(Base):
     processing_time_ms = Column(Integer)
     token_usage = Column(Integer)
     is_used = Column(Boolean, default=False)
-    created_at = Column(TIMESTAMP, default=func.now())
+    created_at = Column(TIMESTAMP, default=functions.now())
     
     # Relationships
     user = relationship("User", back_populates="pr_generations")
@@ -99,7 +99,7 @@ class CommitHistory(Base):
     file_count = Column(Integer, default=0)
     additions = Column(Integer, default=0)
     deletions = Column(Integer, default=0)
-    cached_at = Column(TIMESTAMP, default=func.now())
+    cached_at = Column(TIMESTAMP, default=functions.now())
     
     # Relationships
     repository = relationship("Repository", back_populates="commit_histories")
@@ -115,8 +115,8 @@ class PRTemplate(Base):
     content_template = Column(Text, nullable=False)
     is_default = Column(Boolean, default=False)
     usage_count = Column(Integer, default=0)
-    created_at = Column(TIMESTAMP, default=func.now())
-    updated_at = Column(TIMESTAMP, default=func.now(), onupdate=func.now())
+    created_at = Column(TIMESTAMP, default=functions.now())
+    updated_at = Column(TIMESTAMP, default=functions.now(), onupdate=functions.now())
     
     # Relationships
     user = relationship("User", back_populates="pr_templates")

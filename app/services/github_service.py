@@ -4,9 +4,9 @@ from datetime import datetime
 
 from typing import Optional, Dict, List
 from sqlalchemy.orm import Session
-from .user_service import UserService
-from .repository_service import RepositoryService
-from ..models import User, Repository
+from app.services.user_service import UserService
+from app.services.repository_service import RepositoryService
+from app.models import User, Repository
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

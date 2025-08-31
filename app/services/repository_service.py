@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from ..models import Repository, User
+from app.models import Repository, User
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta, timezone
 import logging
