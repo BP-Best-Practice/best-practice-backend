@@ -159,7 +159,7 @@ class RepositoryService:
         query = self.db.query(Repository).filter(Repository.user_id == user_id)
         
         if not include_archived:
-            query = query.filter(not Repository.archived)
+            query = query.filter(Repository.archived.is_(False))
             
         return query.order_by(Repository.repo_pushed_at.desc()).all()
     
@@ -168,7 +168,7 @@ class RepositoryService:
         return self.db.query(Repository).filter(
             Repository.user_id == user_id,
             Repository.name == repo_name,
-            not Repository.archived # 아카이브된 저장소 제외
+            Repository.archived.is_(False) # 아카이브된 저장소 제외
         ).first()
     
     def increment_access_count(self, repository_id: int):

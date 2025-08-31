@@ -1,10 +1,14 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, TIMESTAMP, BIGINT, ARRAY, JSON
+"""
+    Database models.
+"""
+from sqlalchemy import Column, Integer, String, Text, Boolean, TIMESTAMP, BIGINT, ARRAY, JSON, Index
 from sqlalchemy.sql import functions
 from sqlalchemy.orm import relationship
 from sqlalchemy import ForeignKey
 from .database import Base
 
 class User(Base):
+    """사용자 모델"""
     __tablename__ = "user_account"
     
     id = Column(BIGINT, primary_key=True, autoincrement=True)
@@ -31,6 +35,7 @@ class User(Base):
     pr_templates = relationship("PRTemplate", back_populates="user", cascade="all, delete-orphan")
 
 class Repository(Base):
+    """저장소 모델"""
     __tablename__ = "repository"
     
     id = Column(BIGINT, primary_key=True, autoincrement=True)
@@ -62,6 +67,7 @@ class Repository(Base):
     commit_histories = relationship("CommitHistory", back_populates="repository", cascade="all, delete-orphan")
 
 class PRGeneration(Base):
+    """Pull Request 추천 기록 모델"""
     __tablename__ = "pr_generation"
     
     id = Column(BIGINT, primary_key=True, autoincrement=True)
@@ -86,25 +92,43 @@ class PRGeneration(Base):
     repository = relationship("Repository", back_populates="pr_generations")
 
 class CommitHistory(Base):
+    """커밋 히스토리 모델"""
     __tablename__ = "commit_history"
     
     id = Column(BIGINT, primary_key=True, autoincrement=True)
-    repository_id = Column(BIGINT, ForeignKey("repository.id", ondelete="CASCADE"))
+    repository_id = Column(BIGINT, ForeignKey("repository.id", ondelete="CASCADE"), nullable=False)
     commit_sha = Column(String(40), nullable=False)
     commit_message = Column(Text, nullable=False)
     author_name = Column(String(255))
     author_email = Column(String(255))
     committed_at = Column(TIMESTAMP, nullable=False)
-    files_changed = Column(JSON)
-    file_count = Column(Integer, default=0)
-    additions = Column(Integer, default=0)
-    deletions = Column(Integer, default=0)
-    cached_at = Column(TIMESTAMP, default=functions.now())
+    
+    # 파일 변경 정보
+    files_changed = Column(JSON)  # 파일별 상세 변경 정보
+    file_count = Column(Integer, default=0)  # 변경된 파일 수
+    additions = Column(Integer, default=0)  # 추가된 라인 수
+    deletions = Column(Integer, default=0)  # 삭제된 라인 수
+    
+    # 메타 정보
+    cached_at = Column(TIMESTAMP, default=functions.now())  # 캐시된 시간
     
     # Relationships
     repository = relationship("Repository", back_populates="commit_histories")
+    
+    # 인덱스 설정 (성능 최적화)
+    __table_args__ = (
+        # 복합 인덱스: repository_id + commit_sha (중복 방지 및 빠른 조회)
+        Index('idx_commit_repo_sha', 'repository_id', 'commit_sha', unique=True),
+        # 날짜 기반 조회용 인덱스
+        Index('idx_commit_repo_date', 'repository_id', 'committed_at'),
+        # 작성자 기반 조회용 인덱스
+        Index('idx_commit_repo_author', 'repository_id', 'author_email'),
+        # 캐시 정리용 인덱스
+        Index('idx_commit_cached_at', 'cached_at'),
+    )
 
 class PRTemplate(Base):
+    """Pull Request 템플릿 모델"""
     __tablename__ = "pr_template"
     
     id = Column(BIGINT, primary_key=True, autoincrement=True)
